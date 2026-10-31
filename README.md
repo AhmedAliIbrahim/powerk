@@ -306,15 +306,18 @@ Install on the phone:
   on the phone (the server serves the built APK; that URL needs no token), or
 * `adb install android/app/build/outputs/apk/debug/app-debug.apk`
 
-What you get: an animated splash, a live power ring (watts + energy/voltage/current/RSSI
-pills), 4 animated outlet tiles with an in-tile switch, ALL ON/OFF, offline/error
-states, Snackbars for failed commands, and a settings screen with server IP, port,
-token, a connection Test, and a language switch.
+What you get: a neutral light/dark dashboard matching the web UI, precise AC
+measurements, four native outlet switches, separate All on / All off actions,
+explicit pending/confirmed/error messages, stale readings when disconnected, USB
+capability information, and a browser shortcut to consumption history and CSV.
+Settings retain server IP, port, masked token, HTTPS, connection testing, setup
+instructions, and English/Arabic language selection.
 
 Behavior details:
 
-* Polls `/api/state` every 2 s while the app is visible; a press flips the tile immediately and shows a
-  spinner in the switch while the strip confirms.
+* Polls `/api/state` every 2 s while visible. A requested switch state is labeled
+  pending until the strip confirms; failures are shown explicitly. Last readings
+  remain visible but stale when polling fails, with controls disabled.
 * Commands are blocked per outlet while one is in flight — no toggle storms.
 * **Languages**: Arabic + English, following the phone by default; override in
   Settings (also appears in Android's per-app language menu).
@@ -323,6 +326,13 @@ Behavior details:
   certificate. Tokens are masked in settings and app backup is disabled.
 
 ---
+
+For a separate review install, run `bash gradlew assemblePreview` in `android/`
+and install `app/build/outputs/apk/preview/app-preview.apk`. This installs
+**powerk Preview** (`com.powerk.app.preview`) alongside the normal app, with its own
+server settings. Use it when a local debug signing key differs from an installed
+CI APK; replacing an app with a different signing key is not supported by Android.
+CI publishes both `powerk-debug` and `powerk-preview` artifacts.
 
 ## Web UI and HTTP API
 

@@ -147,6 +147,30 @@ defaults; passing these checks alone does not establish full WCAG conformance.
 - If a UI change needs a new design rule, update this document and the relevant
   guardrails in the same commit. Do not suppress checks to bypass the rules.
 
-The rules govern the web dashboard today. When changing Android UI, preserve its
-platform behavior and use this direction for shared product decisions; do not
-silently migrate unrelated native screens as part of a web-only change.
+## Android implementation
+
+- Android follows the same palette through `PowerkColors` in `Theme.kt`. Do not
+  use dynamic wallpaper colors or literal colors in screen components. Launch
+  backgrounds and the launcher accent must match the shared palette too.
+- Use system fonts and the same numeric type scale in sp. Use `Space` tokens in
+  dp for layout and the 8/12/16 dp control/card/panel radii. Respect font scaling;
+  outlet cards become one column on narrow layouts or with larger text.
+- Native Material switches, buttons, navigation, text fields, focus behavior,
+  and accessibility semantics remain native. Android touch targets are at least
+  48 dp. Do not imitate HTML controls or replace switches with clickable cards.
+- Keep surfaces neutral, use blue for small selected controls and live power,
+  and red for errors. Keep separate All on / All off actions. Show accurate
+  small readings and explicit units, device identity, firmware and online state.
+- Remove decorative power rings, pulsing dots, animated numbers, splash delays,
+  and screen movement. Native control feedback follows Android motion settings.
+- On connection failure retain the last readings with stale labels, exclude
+  them from live totals, and disable power controls. Announce command pending,
+  confirmed, and failed states politely. Key strip/outlet identity across refreshes.
+- Keep English/Arabic translations and RTL layout, masked tokens, HTTPS settings,
+  connection testing and provisioning instructions. Saved history and CSV are
+  available through the labeled browser shortcut to the dashboard.
+- USB capability disclosure follows the same verified firmware restriction as
+  the dashboard; never draw fake USB switches or measurements.
+- Run the Android unit tests, lint and debug build plus the shared Node design
+  checks. Review phone layouts, large text, RTL and both themes; never toggle
+  real outlets just to test appearance.

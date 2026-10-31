@@ -13,9 +13,17 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+        manifestPlaceholders["appLabel"] = "@string/app_name"
     }
 
     buildTypes {
+        create("preview") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".preview"
+            versionNameSuffix = "-preview"
+            manifestPlaceholders["appLabel"] = "powerk Preview"
+            matchingFallbacks += "debug"
+        }
         release {
             isMinifyEnabled = false
         }
