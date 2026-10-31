@@ -1,5 +1,7 @@
 package com.powerk.app
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -16,6 +18,10 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -35,11 +41,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun PowerkApp() {
+fun PowerkApp(dark: Boolean, onThemeChange: () -> Unit) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
+    BackHandler(enabled = tab == 1) { tab = 0 }
     var snapshot by remember { mutableStateOf<Snapshot?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(false) }
+    var syncedAt by remember { mutableStateOf<String?>(null) }
     var feedback by remember { mutableStateOf<String?>(null) }
     var commandFailed by remember { mutableStateOf(false) }
     val resources = LocalResources.current
@@ -52,6 +60,7 @@ fun PowerkApp() {
         loading = true
         try {
             snapshot = Api.snapshot(Server.base, Server.token)
+            syncedAt = java.text.DateFormat.getTimeInstance().format(java.util.Date())
             error = null
         } catch (e: CancellationException) {
             throw e
@@ -89,18 +98,14 @@ fun PowerkApp() {
     }
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
-                NavigationBarItem(selected = tab == 0, onClick = { tab = 0 },
-                    icon = { Icon(Icons.Filled.Home, null) }, label = { Text(stringResource(R.string.tab_plugs)) })
-                NavigationBarItem(selected = tab == 1, onClick = { tab = 1 },
-                    icon = { Icon(Icons.Filled.Settings, null) }, label = { Text(stringResource(R.string.tab_settings)) })
-            }
+        topBar = {
+            DashboardTopBar(tab == 1, dark, loading, onThemeChange,
+                onRefresh = { scope.launch { refresh() } }, onSettings = { tab = if (tab == 1) 0 else 1 })
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
-            if (tab == 0) PlugsScreen(snapshot, error, loading, pending, feedback, commandFailed,
-                onRefresh = { scope.launch { refresh() } }, onOpenSettings = { tab = 1 },
+            if (tab == 0) PlugsScreen(snapshot, error, pending, feedback, commandFailed, syncedAt,
+                onOpenSettings = { tab = 1 },
                 onCommand = { mac, outlet, on -> command(mac, outlet, on) })
             else SettingsScreen()
         }
@@ -121,84 +126,200 @@ private fun SectionTitle(title: String) {
 }
 
 @Composable
-private fun PlugsScreen(
-    snapshot: Snapshot?, error: String?, loading: Boolean, pending: Map<String, Boolean>,
-    feedback: String?, commandFailed: Boolean, onRefresh: () -> Unit, onOpenSettings: () -> Unit,
-    onCommand: (String, Int, Boolean) -> Unit,
-) {
-    val strips = snapshot?.strips.orEmpty()
-    val healthy = error == null && snapshot != null
-    val live = liveSummary(strips, healthy)
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(Space.lg), verticalArrangement = Arrangement.spacedBy(Space.lg)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
-                    Text(stringResource(R.string.power_overview), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
-                    Text(stringResource(R.string.dashboard_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                IconButton(onClick = onRefresh, enabled = Server.configured && !loading) {
-                    Icon(Icons.Filled.Refresh, stringResource(R.string.refresh))
-                }
-            }
-        }
-        if (error != null) item { MessageCard(stringResource(R.string.connection_stale, error), true) }
-        if (feedback != null) item { MessageCard(feedback, commandFailed) }
-        if (!Server.configured) item {
-            EmptyState(stringResource(R.string.no_server_title), stringResource(R.string.no_server_body), stringResource(R.string.open_settings), onOpenSettings)
-        } else {
-            item {
-                Panel {
-                    Column(Modifier.padding(Space.lg), verticalArrangement = Arrangement.spacedBy(Space.md)) {
-                        Text(stringResource(R.string.ac_power), style = MaterialTheme.typography.titleSmall)
-                        Text("${measurement(live.powerW)} W",
-                            style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.primary)
-                        Text(stringResource(R.string.live_strip_count, live.reporting), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                        Text(stringResource(R.string.active_outlets, live.active, live.outlets), style = MaterialTheme.typography.bodyMedium)
+private fun DashboardTopBar(settings: Boolean, dark: Boolean, loading: Boolean, onThemeChange: () -> Unit, onRefresh: () -> Unit, onSettings: () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(Modifier.statusBarsPadding().padding(horizontal = Space.md)) {
+            Row(Modifier.fillMaxWidth().padding(vertical = Space.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    Surface(shape = MaterialTheme.shapes.small, color = MaterialTheme.colorScheme.onSurface) {
+                        DashboardGlyph(Glyph.Power, Modifier.padding(Space.xs).size(Space.xxl), inverse = true)
                     }
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge)
+                }
+                HeaderAction(stringResource(if (dark) R.string.light_theme else R.string.dark_theme), onThemeChange) {
+                    DashboardGlyph(Glyph.Theme, Modifier.size(Space.xl))
+                }
+                HeaderAction(stringResource(R.string.refresh), onRefresh, Server.configured && !loading) { Icon(Icons.Filled.Refresh, null, Modifier.size(Space.xl)) }
+                HeaderAction(stringResource(if (settings) R.string.power_overview else R.string.settings_title), onSettings) {
+                    Icon(if (settings) Icons.Filled.Home else Icons.Filled.Settings, null, Modifier.size(Space.xl))
                 }
             }
-            item { SectionTitle(stringResource(R.string.your_strips)) }
-            items(strips, key = { it.mac }) { strip -> StripCard(strip, healthy, pending, onCommand) }
-            if (snapshot != null && strips.isEmpty()) item { EmptyState(stringResource(R.string.no_strip_title), stringResource(R.string.no_strip_body)) }
-            if (snapshot == null && error == null) item { MessageCard(stringResource(R.string.connecting, Server.host), false) }
-            item {
-                val context = LocalContext.current
-                OutlinedButton(onClick = {
-                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(Server.base + "/#history-title")))
-                }, modifier = Modifier.fillMaxWidth().heightIn(min = Space.target)) { Text(stringResource(R.string.open_history)) }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+@Composable
+private fun HeaderAction(label: String, onClick: () -> Unit, enabled: Boolean = true, content: @Composable () -> Unit) {
+    OutlinedButton(onClick = onClick, enabled = enabled, shape = MaterialTheme.shapes.small,
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+        modifier = Modifier.size(Space.target).semantics { contentDescription = label }, contentPadding = PaddingValues(Space.sm)) { content() }
+}
+
+private enum class Glyph { Power, Energy, Theme, Socket }
+
+/** Shared single-stroke symbols corresponding to the dashboard's power and socket marks. */
+@Composable
+private fun DashboardGlyph(glyph: Glyph, modifier: Modifier = Modifier, inverse: Boolean = false) {
+    val ink = if (inverse) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.onSurfaceVariant
+    Canvas(modifier.clearAndSetSemantics {}) {
+        val stroke = size.minDimension * .05f
+        val center = Offset(size.width / 2, size.height / 2)
+        when (glyph) {
+            Glyph.Socket -> {
+                drawCircle(ink, size.minDimension * .46f, center, style = Stroke(stroke))
+                for (x in listOf(.39f, .61f)) drawLine(ink, Offset(size.width * x, size.height * .43f), Offset(size.width * x, size.height * .57f), strokeWidth = stroke * 1.6f, cap = StrokeCap.Round)
+            }
+            Glyph.Power -> {
+                drawArc(ink, -45f, 270f, false, Offset(size.width * .18f, size.height * .18f), Size(size.width * .64f, size.height * .64f), style = Stroke(stroke, cap = StrokeCap.Round))
+                drawLine(ink, Offset(center.x, size.height * .1f), Offset(center.x, center.y), stroke, StrokeCap.Round)
+            }
+            Glyph.Energy -> {
+                drawLine(ink, Offset(size.width * .25f, size.height * .75f), Offset(size.width * .75f, size.height * .25f), stroke, StrokeCap.Round)
+                drawLine(ink, Offset(size.width * .35f, size.height * .25f), Offset(size.width * .75f, size.height * .25f), stroke, StrokeCap.Round)
+                drawLine(ink, Offset(size.width * .75f, size.height * .25f), Offset(size.width * .75f, size.height * .65f), stroke, StrokeCap.Round)
+            }
+            Glyph.Theme -> {
+                drawCircle(ink, size.minDimension * .38f, center, style = Stroke(stroke))
+                drawArc(ink, 90f, 180f, false, Offset(size.width * .12f, size.height * .12f), Size(size.width * .76f, size.height * .76f))
             }
         }
     }
 }
 
 @Composable
-private fun StripCard(strip: Strip, healthy: Boolean, pending: Map<String, Boolean>, onCommand: (String, Int, Boolean) -> Unit) {
+private fun SummaryMetric(label: String, value: String, unit: String, note: String, glyph: Glyph, modifier: Modifier = Modifier, primary: Boolean = false) {
+    Panel(modifier) {
+        Column(Modifier.padding(Space.xl), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+            Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Space.sm)) {
+                Text(label, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                DashboardGlyph(glyph, Modifier.size(Space.xl))
+            }
+            FlowRow(Modifier.padding(top = Space.sm), horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                Text(value, Modifier.alignByBaseline(), style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum"), color = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                Text(unit, Modifier.alignByBaseline(), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text(note, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun PlugsScreen(
+    snapshot: Snapshot?, error: String?, pending: Map<String, Boolean>, feedback: String?, commandFailed: Boolean,
+    syncedAt: String?, onOpenSettings: () -> Unit, onCommand: (String, Int, Boolean) -> Unit,
+) {
+    val strips = snapshot?.strips.orEmpty()
+    val healthy = error == null && snapshot != null
+    val live = liveSummary(strips, healthy)
+    val cumulative = strips.takeIf { it.isNotEmpty() }?.sumOf { it.energyKwh }
+    val staleCounter = !healthy || strips.any { !it.online }
+    BoxWithConstraints {
+        val compact = maxWidth <= DashboardLayout.compactWidth
+        val pageSpace = if (compact) Space.md else Space.xl
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = pageSpace, vertical = Space.section), verticalArrangement = Arrangement.spacedBy(Space.xxl)) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(Space.sm)) {
+                    Text(stringResource(R.string.device_dashboard), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.power_overview), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.semantics { heading() })
+                    Text(stringResource(R.string.dashboard_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    syncedAt?.let { Text(stringResource(R.string.last_synced, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
+            }
+            if (error != null) item { MessageCard(stringResource(R.string.connection_stale, error), true) }
+            if (feedback != null) item { MessageCard(feedback, commandFailed) }
+            if (!Server.configured) item {
+                EmptyState(stringResource(R.string.no_server_title), stringResource(R.string.no_server_body), stringResource(R.string.open_settings), onOpenSettings)
+            } else {
+                item {
+                    Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
+                        SummaryMetric(stringResource(R.string.ac_power), measurement(live.powerW), "W", stringResource(R.string.live_strip_count, live.reporting), Glyph.Power, primary = true)
+                        val largeText = androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.2f
+                        if (largeText) {
+                            SummaryMetric(stringResource(R.string.active_ac_label), if (live.reporting > 0) live.active.toString() else "—", if (live.reporting > 0) stringResource(R.string.of_outlets, live.outlets) else "", stringResource(R.string.across_connected), Glyph.Power)
+                            SummaryMetric(stringResource(R.string.ac_energy), measurement(cumulative, 3), "kWh", stringResource(if (staleCounter) R.string.counter_stale else R.string.counter_note), Glyph.Energy)
+                        } else Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                            SummaryMetric(stringResource(R.string.active_ac_label), if (live.reporting > 0) live.active.toString() else "—", if (live.reporting > 0) stringResource(R.string.of_outlets, live.outlets) else "", stringResource(R.string.across_connected), Glyph.Power, Modifier.weight(1f))
+                            SummaryMetric(stringResource(R.string.ac_energy), measurement(cumulative, 3), "kWh", stringResource(if (staleCounter) R.string.counter_stale else R.string.counter_note), Glyph.Energy, Modifier.weight(1f))
+                        }
+                    }
+                }
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                        Text(stringResource(R.string.your_strips), Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+                        StatusPill(stringResource(R.string.strip_counts, live.reporting, strips.size))
+                    }
+                }
+                items(strips, key = { it.mac }) { strip -> StripCard(strip, healthy, pending, onCommand, compact) }
+                if (snapshot != null && strips.isEmpty()) item { EmptyState(stringResource(R.string.no_strip_title), stringResource(R.string.no_strip_body)) }
+                if (snapshot == null && error == null) item { MessageCard(stringResource(R.string.connecting, Server.host), false) }
+                item { HistoryEntry() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(label: String) {
+    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+        Text(label, Modifier.padding(horizontal = Space.sm, vertical = Space.xs), style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun HistoryEntry() {
+    val context = LocalContext.current
+    Panel {
+        Column(Modifier.padding(Space.xl), verticalArrangement = Arrangement.spacedBy(Space.md)) {
+            SectionTitle(stringResource(R.string.history_title))
+            Text(stringResource(R.string.history_browser_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            DashboardButton(stringResource(R.string.open_history), onClick = {
+                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(Server.base + "/#history-title")))
+            })
+        }
+    }
+}
+
+@Composable
+private fun DashboardButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
+    OutlinedButton(onClick = onClick, enabled = enabled, shape = MaterialTheme.shapes.small,
+        modifier = modifier.heightIn(min = Space.target), contentPadding = PaddingValues(horizontal = Space.md, vertical = Space.sm),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface)) { Text(label) }
+}
+
+@Composable
+private fun StripCard(strip: Strip, healthy: Boolean, pending: Map<String, Boolean>, onCommand: (String, Int, Boolean) -> Unit, compact: Boolean) {
     val enabled = healthy && strip.online
     val anyPending = (1..4).any { pending.containsKey("${strip.mac}:$it") }
     var details by rememberSaveable(strip.mac) { mutableStateOf(false) }
     Panel {
-        Column(Modifier.padding(Space.lg), verticalArrangement = Arrangement.spacedBy(Space.lg)) {
-            Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-                SectionTitle(strip.name.ifBlank { stringResource(R.string.strip_name) })
-                Text("${strip.model} · ${stringResource(R.string.strip_fw, strip.fw)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(stringResource(if (enabled) R.string.online else R.string.offline_stale), style = MaterialTheme.typography.labelLarge)
+        Column(Modifier.padding(if (compact) Space.md else Space.xl), verticalArrangement = Arrangement.spacedBy(Space.lg)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.md)) {
+                Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceVariant, border = BorderStroke(Space.xs / 4, MaterialTheme.colorScheme.outlineVariant)) {
+                    DashboardGlyph(Glyph.Power, Modifier.padding(Space.sm).size(Space.xxl))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                    Text(strip.name.ifBlank { stringResource(R.string.strip_name) }, style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
+                    Text("${strip.model} · ${stringResource(R.string.strip_fw, strip.fw)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
-            Text("${measurement(strip.powerW)} W", style = MaterialTheme.typography.headlineLarge.copy(fontFeatureSettings = "tnum"))
-            Text(stringResource(if (enabled) R.string.live_ac_readings else R.string.stale_ac_readings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Metric(stringResource(R.string.ac_energy), "${measurement(strip.energyKwh, 3)} kWh")
-            Metric(stringResource(R.string.voltage), "${measurement(strip.voltage)} V")
-            Metric(stringResource(R.string.current), "${measurement(strip.currentA)} A")
-            Metric(stringResource(R.string.wifi), "${strip.rssi ?: "—"} dBm")
-            // Explicit bulk actions never derive a command from mixed outlet state.
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-                OutlinedButton(onClick = { onCommand(strip.mac, 0, true) }, enabled = enabled && !anyPending, modifier = Modifier.heightIn(min = Space.target)) { Text(stringResource(R.string.turn_all_on)) }
-                OutlinedButton(onClick = { onCommand(strip.mac, 0, false) }, enabled = enabled && !anyPending, modifier = Modifier.heightIn(min = Space.target)) { Text(stringResource(R.string.turn_all_off)) }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.sm), verticalArrangement = Arrangement.spacedBy(Space.sm), itemVerticalAlignment = Alignment.CenterVertically) {
+                StatusPill(stringResource(if (enabled) R.string.online else R.string.offline_short))
+                DashboardButton(stringResource(R.string.all_on_short), { onCommand(strip.mac, 0, true) }, enabled && !anyPending)
+                DashboardButton(stringResource(R.string.all_off_short), { onCommand(strip.mac, 0, false) }, enabled && !anyPending)
             }
+            Text(
+                "${measurement(strip.powerW)} W · ${measurement(strip.energyKwh, 3)} kWh · ${measurement(strip.voltage)} V · ${measurement(strip.currentA)} A · ${stringResource(R.string.wifi)} ${strip.rssi ?: "—"} dBm",
+                style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!enabled) Text(stringResource(R.string.stale_ac_readings), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             BoxWithConstraints {
                 // At large font scales use one column to preserve labels and switch targets.
-                val columns = if (maxWidth >= Space.section * 9 && androidx.compose.ui.platform.LocalDensity.current.fontScale <= 1.2f) 2 else 1
+                val columns = when {
+                    androidx.compose.ui.platform.LocalDensity.current.fontScale > 1.2f -> 1
+                    maxWidth >= DashboardLayout.outletFourWidth -> 4
+                    maxWidth >= DashboardLayout.outletPairWidth -> 2
+                    else -> 1
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(Space.md)) {
                     strip.outlets.sortedBy { it.n }.chunked(columns).forEach { outlets ->
                         Row(horizontalArrangement = Arrangement.spacedBy(Space.md)) {
@@ -219,18 +340,10 @@ private fun StripCard(strip: Strip, healthy: Boolean, pending: Map<String, Boole
                     }
                 }
             }
-            OutlinedButton(onClick = { details = !details }, modifier = Modifier.heightIn(min = Space.target),
-                content = { Text(stringResource(if (details) R.string.hide_details else R.string.device_details)) })
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            DashboardButton(stringResource(if (details) R.string.hide_details else R.string.device_details), { details = !details })
             if (details) Text(strip.mac, style = MaterialTheme.typography.bodySmall)
         }
-    }
-}
-
-@Composable
-private fun Metric(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
-        Text(label, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"))
     }
 }
 
@@ -244,21 +357,26 @@ private fun OutletTile(outlet: Outlet, target: Boolean?, enabled: Boolean, onTog
         outlet.on -> R.string.state_on
         else -> R.string.state_off
     })
-    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(Space.xs / 4, MaterialTheme.colorScheme.outline)) {
+    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = if (outlet.on) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
+        border = BorderStroke(Space.xs / 4, if (outlet.on) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outlineVariant)) {
         Column(Modifier.padding(Space.md), verticalArrangement = Arrangement.spacedBy(Space.sm)) {
-            Text(stringResource(R.string.outlet_n, outlet.n), style = MaterialTheme.typography.titleSmall)
-            Switch(checked = target ?: outlet.on, onCheckedChange = onToggle, enabled = enabled && !pending,
+            Row(Modifier.fillMaxWidth().padding(bottom = Space.sm), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                DashboardGlyph(Glyph.Socket, Modifier.size(Space.section))
+                Switch(checked = target ?: outlet.on, onCheckedChange = onToggle, enabled = enabled && !pending,
                 modifier = Modifier.heightIn(min = Space.target).semantics { contentDescription = label; stateDescription = state },
                 colors = SwitchDefaults.colors(
                     checkedThumbColor = MaterialTheme.colorScheme.onPrimary, checkedTrackColor = MaterialTheme.colorScheme.primary,
                     uncheckedThumbColor = MaterialTheme.colorScheme.onPrimary, uncheckedTrackColor = MaterialTheme.colorScheme.outline,
                     uncheckedBorderColor = MaterialTheme.colorScheme.outline,
                 ))
+            }
+            Text(stringResource(R.string.outlet_n, outlet.n), style = MaterialTheme.typography.titleSmall)
             Text(state, style = MaterialTheme.typography.bodySmall, color = if (enabled && outlet.on && !pending) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            Text("${measurement(outlet.powerW)} W", style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum"))
-            Text("${measurement(outlet.energyKwh, 3)} kWh", style = MaterialTheme.typography.bodySmall)
-            Text("${outlet.tempC} °C", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xs)) {
+                Text(measurement(outlet.powerW), Modifier.alignByBaseline(), style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum"))
+                Text("W", Modifier.alignByBaseline(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Text("${outlet.tempC} °C · ${measurement(outlet.energyKwh, 3)} kWh", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -392,6 +510,7 @@ private fun SettingsScreen() {
                         modifier = Modifier.weight(1f).heightIn(min = Space.target),
                     ) { Text(stringResource(R.string.save)) }
                     OutlinedButton(
+                        shape = MaterialTheme.shapes.small,
                         enabled = !busy,
                         onClick = {
                             commit()
@@ -432,6 +551,7 @@ private fun SettingsScreen() {
                     }
                 }
                 OutlinedButton(
+                        shape = MaterialTheme.shapes.small,
                     onClick = {
                         commit()
                         context.startActivity(

@@ -37,3 +37,19 @@ test('Android launch surfaces and icon match the shared neutral and blue palette
   assert.match(fs.readFileSync(root + 'res/values-night/colors.xml','utf8'), /window_background">#111318/);
   assert.match(fs.readFileSync(root + 'res/drawable/ic_launcher_foreground.xml','utf8'), /fillColor="@color\/launcher_accent"/);
 });
+
+test('Android preserves the dashboard hierarchy and outlet card composition', () => {
+  assert.match(ui, /topBar = \{\s*DashboardTopBar/);
+  assert.doesNotMatch(ui, /NavigationBarItem|bottomBar =/);
+  for (const label of ['ac_power', 'active_ac_label', 'ac_energy']) {
+    assert.match(ui, new RegExp(`SummaryMetric\\(stringResource\\(R.string.${label}\\)`));
+  }
+  assert.match(ui, /DashboardGlyph\(Glyph.Socket/);
+  assert.match(ui, /maxWidth >= DashboardLayout.outletPairWidth -> 2/);
+  assert.match(ui, /maxWidth >= DashboardLayout.outletFourWidth -> 4/);
+  assert.match(ui, /fontScale > 1.2f -> 1/);
+  assert.match(ui, /color = if \(outlet.on\) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant/);
+  assert.match(ui, /private fun DashboardButton[\s\S]*?shape = MaterialTheme.shapes.small/);
+  assert.match(ui, /modifier = modifier.heightIn\(min = Space.target\)/);
+  assert.match(ui, /Modifier.alignByBaseline\(\)/);
+});

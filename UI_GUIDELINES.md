@@ -149,6 +149,23 @@ defaults; passing these checks alone does not establish full WCAG conformance.
 
 ## Android implementation
 
+- Match the dashboard's information hierarchy as well as its colors: a brand
+  bar with theme/refresh/settings controls; an eyebrow, title and sync time;
+  a full-width AC power card above separate active-outlet and cumulative-energy
+  cards; then the strip list with a count badge. Keep settings reachable from
+  the top bar instead of adding a different dashboard navigation layout.
+- Strip cards use a power mark, name/model/firmware, online badge and separate
+  All on / All off actions. Keep W/kWh/V/A/Wi-Fi in a compact wrapping summary
+  above the outlet grid, rather than tall independent metric rows.
+- At normal phone text sizes show two outlet columns, with a socket symbol and
+  native switch together at the top, followed by label/state, prominent watts,
+  and compact temperature/energy metadata. Use four columns when there is room,
+  and one column for larger accessibility text. Off cards use the subtle surface;
+  powered cards use the neutral surface and a meaningful control border.
+- Dashboard action buttons explicitly use 8 dp corners and neutral text; do not
+  inherit Material's default pill buttons. Numbers and smaller unit labels share
+  a baseline. Keep history as a clearly labeled browser entry until native
+  analytics are implemented; do not claim that shortcut is a native history view.
 - Android follows the same palette through `PowerkColors` in `Theme.kt`. Do not
   use dynamic wallpaper colors or literal colors in screen components. Launch
   backgrounds and the launcher accent must match the shared palette too.

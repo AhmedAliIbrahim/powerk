@@ -313,6 +313,11 @@ capability information, and a browser shortcut to consumption history and CSV.
 Settings retain server IP, port, masked token, HTTPS, connection testing, setup
 instructions, and English/Arabic language selection.
 
+The mobile layout follows the web dashboard: brand/theme/refresh/settings bar,
+three summary cards, compact strip metadata and bulk actions, and two outlet
+columns with socket symbols and native switches. Larger accessibility text uses
+one column. The theme choice is saved independently of connection settings.
+
 Behavior details:
 
 * Polls `/api/state` every 2 s while visible. A requested switch state is labeled

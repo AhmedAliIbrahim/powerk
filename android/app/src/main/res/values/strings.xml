@@ -25,8 +25,8 @@
     <string name="turn_all_on">Turn all on</string>
     <string name="turn_all_off">Turn all off</string>
     <string name="outlet_n">Outlet %1$d</string>
-    <string name="state_on">ON</string>
-    <string name="state_off">OFF</string>
+    <string name="state_on">Powered on</string>
+    <string name="state_off">Powered off</string>
     <string name="tile_on_detail">%1$s W · %2$d°C</string>
     <string name="tile_off_detail">%1$d°C idle</string>
     <string name="watts_now">now</string>
@@ -82,4 +82,19 @@
     <string name="hide_details">Hide device identity</string>
     <string name="open_history">Consumption history and CSV ↗</string>
     <string name="testing">Testing connection…</string>
+    <string name="light_theme">Light theme</string>
+    <string name="dark_theme">Dark theme</string>
+    <string name="device_dashboard">DEVICE DASHBOARD</string>
+    <string name="last_synced">Last synced %1$s</string>
+    <string name="active_ac_label">Active AC outlets</string>
+    <string name="of_outlets">of %1$d</string>
+    <string name="across_connected">Across connected strips</string>
+    <string name="counter_note">Device-reported cumulative total</string>
+    <string name="counter_stale">Cumulative total · includes stale readings</string>
+    <string name="strip_counts">%1$d online · %2$d known</string>
+    <string name="offline_short">Offline</string>
+    <string name="all_on_short">All on</string>
+    <string name="all_off_short">All off</string>
+    <string name="history_title">AC consumption history</string>
+    <string name="history_browser_note">View saved consumption, choose periods and outlets, and export CSV in the web dashboard.</string>
 </resources>

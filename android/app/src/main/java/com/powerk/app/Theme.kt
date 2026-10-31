@@ -50,6 +50,12 @@ object Space {
     val target = 48.dp
 }
 
+object DashboardLayout {
+    val compactWidth = 380.dp
+    val outletPairWidth = 256.dp
+    val outletFourWidth = 640.dp
+}
+
 private val LightScheme = with(PowerkColors) { lightColorScheme(
     primary = LightAccent, onPrimary = LightSurface,
     primaryContainer = LightAccentSoft, onPrimaryContainer = LightAccentInk,

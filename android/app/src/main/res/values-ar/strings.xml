@@ -82,4 +82,19 @@
     <string name="hide_details">إخفاء هوية الجهاز</string>
     <string name="open_history">سجل الاستهلاك وملفات CSV ↗</string>
     <string name="testing">جاري اختبار الاتصال…</string>
+    <string name="light_theme">الوضع الفاتح</string>
+    <string name="dark_theme">الوضع الداكن</string>
+    <string name="device_dashboard">لوحة الأجهزة</string>
+    <string name="last_synced">آخر تحديث %1$s</string>
+    <string name="active_ac_label">الفيش الشغالة</string>
+    <string name="of_outlets">من %1$d</string>
+    <string name="across_connected">عبر المشتركات المتصلة</string>
+    <string name="counter_note">الإجمالي التراكمي من الجهاز</string>
+    <string name="counter_stale">إجمالي تراكمي · يتضمن قراءات قديمة</string>
+    <string name="strip_counts">%1$d متصل · %2$d معروف</string>
+    <string name="offline_short">غير متصل</string>
+    <string name="all_on_short">تشغيل الكل</string>
+    <string name="all_off_short">إيقاف الكل</string>
+    <string name="history_title">سجل استهلاك فيش الكهرباء</string>
+    <string name="history_browser_note">اعرض الاستهلاك المحفوظ واختر الفترة والفيش وصدّر ملفات CSV من لوحة الويب.</string>
 </resources>
