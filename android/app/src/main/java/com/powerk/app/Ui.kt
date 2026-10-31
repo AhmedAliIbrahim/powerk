@@ -354,8 +354,8 @@ private fun OutletTile(outlet: Outlet, target: Boolean?, enabled: Boolean, onTog
     val state = stringResource(when {
         pending -> R.string.command_pending
         !enabled -> R.string.offline_stale
-        outlet.on -> R.string.state_on
-        else -> R.string.state_off
+        outlet.on -> R.string.outlet_state_on
+        else -> R.string.outlet_state_off
     })
     Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, color = if (outlet.on) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
         border = BorderStroke(Space.xs / 4, if (outlet.on) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.outlineVariant)) {

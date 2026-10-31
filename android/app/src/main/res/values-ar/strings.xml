@@ -25,8 +25,8 @@
     <string name="turn_all_on">شغّلهم كلهم</string>
     <string name="turn_all_off">اطفيهم كلهم</string>
     <string name="outlet_n">الفيشة %1$d</string>
-    <string name="state_on">شغالة</string>
-    <string name="state_off">مقفولة</string>
+    <string name="outlet_state_on">شغالة</string>
+    <string name="outlet_state_off">مقفولة</string>
     <string name="tile_on_detail">%1$s وات · %2$d°</string>
     <string name="tile_off_detail">%1$d° · مش واصلالها كهربا</string>
     <string name="watts_now">دلوقتي</string>

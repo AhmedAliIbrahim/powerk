@@ -25,8 +25,8 @@
     <string name="turn_all_on">Turn all on</string>
     <string name="turn_all_off">Turn all off</string>
     <string name="outlet_n">Outlet %1$d</string>
-    <string name="state_on">Powered on</string>
-    <string name="state_off">Powered off</string>
+    <string name="outlet_state_on">Powered on</string>
+    <string name="outlet_state_off">Powered off</string>
     <string name="tile_on_detail">%1$s W · %2$d°C</string>
     <string name="tile_off_detail">%1$d°C idle</string>
     <string name="watts_now">now</string>

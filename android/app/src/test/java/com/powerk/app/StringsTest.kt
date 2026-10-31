@@ -14,6 +14,13 @@ import javax.xml.parsers.DocumentBuilderFactory
  */
 class StringsTest {
 
+    @Test
+    fun outletStateLabelsDoNotCollideWithComposeTranslations() {
+        assertTrue(default.containsKey("outlet_state_on"))
+        assertTrue(default.containsKey("outlet_state_off"))
+        assertTrue("Generic state resources collide with AndroidX translations", "state_on" !in default && "state_off" !in default)
+    }
+
     private val format = Regex("""%(\d+)\$([a-zA-Z])""")
     private val default = load("src/main/res/values/strings.xml")
     private val arabic = load("src/main/res/values-ar/strings.xml")
